@@ -16,39 +16,65 @@ const tvNamespace = io.of('/tv')
 const adminNamespace = io.of('/admin')
 
 tvNamespace.on('connection', socket => {
-    socket.on('iamtv', (uid, fn) => {
-        uid = uid ? uid : uuid();
-        
-        tvs[socket.id] = { uid };
+    socket.on('disconnect', () => {
+        console.log('disconnected', socket.id)
+
+        const o = tvs[socket.id];
+
+        if (o) {
+            delete tvs[socket.id];
+            adminNamespace.emit('tv disconnect', { ...o, _id: socket.id });
+        }
+    })
+
+    socket.on('x', (data) => {
+        console.log('received X', data)
+    })
+
+    socket.on('iamtv', (data, fn) => {
+        const uid = data.uid ? data.uid : uuid();
+        const tv = {
+            uid,
+            source: data.source            
+        };
+
+        tvs[socket.id] = tv;
         
         // Let the client know what their uid has become
         fn(uid)
+
+        adminNamespace.emit('tv connect', { ...tv, _id: socket.id });
     })
 
-    socket.on('display', data => {
-        console.log('display event received, should broadcast this')
-    })
-
+    // TODO: remove this debug code
     setTimeout(() => {
-        socket.emit('display', { source: 'https://p.datadoghq.com/sb/18deb0e26-e9b56a91714bafd1fb6e89f008566026?tv_mode=true' })
+        // socket.emit('display', { source: 'https://p.datadoghq.com/sb/18deb0e26-e9b56a91714bafd1fb6e89f008566026?tv_mode=true' })
+        socket.emit('display', { source: 'https://bing.nl' })
     }, 3000)
-})
-
-tvNamespace.on('disconnect', socket => {
-    delete tvs[socket.id]
 })
 
 adminNamespace.on('connection', socket => {
     socket.on('list', (data, fn) => {
         console.log('list invoked', data)
-        fn(Object.keys(tvs))
+
+        fn(Object.keys(tvs).map(key => {
+            const o = tvs[key]
+
+            return {
+                ...o,
+                _id: key,
+            }
+        }));
     })
 
     socket.on('display', (data) => {
         const target = tvNamespace.sockets[data.uid];
+
         console.log('received display event', data)
 
         if (target) {
+            tvs[data.uid].source = data.source;
+
             target.emit('display', { source: data.source })
         }
     })
