@@ -1,13 +1,17 @@
-const port = 8081
+const port = process.env.PORT || 8081
 
 const handler = (req, res) => {
     res.writeHead(404)
     res.end()
 }
 
-const http = require('http')
-const app = http.createServer(handler)
-const io = require('socket.io')(app)
+const server = require('http').createServer(handler)
+
+const io = require('socket.io')(server, {
+    serveClient: false,
+    wsEngine: 'ws'
+})
+
 const uuid = require('uuid/v4')
 
 const tvs = { };
@@ -45,12 +49,6 @@ tvNamespace.on('connection', socket => {
 
         adminNamespace.emit('tv connect', { ...tv, _id: socket.id });
     })
-
-    // TODO: remove this debug code
-    setTimeout(() => {
-        // socket.emit('display', { source: 'https://p.datadoghq.com/sb/18deb0e26-e9b56a91714bafd1fb6e89f008566026?tv_mode=true' })
-        socket.emit('display', { source: 'https://bing.nl' })
-    }, 3000)
 })
 
 adminNamespace.on('connection', socket => {
@@ -80,6 +78,6 @@ adminNamespace.on('connection', socket => {
     })
 })
 
-app.listen(port)
+server.listen(port)
 
 console.info('started on port', port)
